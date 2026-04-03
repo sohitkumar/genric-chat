@@ -41,7 +41,13 @@ def chat_stream(request: ChatRequest):
 
     def sse_generator():
         for token in stream_chat_response(request.message):
-            # Format each token as an SSE event
-            yield f"data: {token}\n\n"
+            # A token might contain newlines (e.g. "end.\n\n### Heading").
+            # In SSE, a bare \n inside a "data:" field would prematurely
+            # end the event. So we split on \n and emit each piece as its
+            # own "data:" event. Empty pieces (from consecutive \n\n) become
+            # empty "data:" events, which the client reads back as \n.
+            lines = token.split("\n")
+            for line in lines:
+                yield f"data: {line}\n\n"
 
     return StreamingResponse(sse_generator(), media_type="text/event-stream")

@@ -9,11 +9,21 @@
 
 import uvicorn
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from app.routes.chat import router as chat_router
 
 app = FastAPI(
     title="LLM Chatbot API",
     description="A minimal chatbot API powered by OpenAI",
+)
+
+# CORS: allows your frontend (e.g., React on localhost:3000) to call this API.
+# Without this, browsers block cross-origin requests for security reasons.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Include the chat router — this adds the POST /chat endpoint
