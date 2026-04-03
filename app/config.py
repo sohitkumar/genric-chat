@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     # Which model to use — defaults to gpt-4o-mini (cheap and fast, good for learning)
     MODEL_NAME: str = "gpt-4o-mini"
 
+    CLASSIFIER_MODEL_NAME: str = "gpt-4o-mini"
+
+    GUARD_ENABLED: bool = True
+
     # Tell pydantic-settings to read from a .env file in the project root
     model_config = SettingsConfigDict(env_file=".env")
 

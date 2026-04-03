@@ -1,0 +1,9 @@
+Classify the following user query. Respond YES if it matches ANY of these categories, otherwise respond NO.
+
+Allowed categories:
+- Pharmaceuticals, drugs, medications, pharmacology
+- Drug interactions, dosages, side effects, formulations
+- Pharmaceutical regulations (FDA, EMA)
+- Basic greetings and pleasantries (hi, hello, good morning, thanks, bye, how are you)
+
+Respond with exactly one word: YES or NO.

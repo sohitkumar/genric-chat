@@ -15,6 +15,7 @@ from collections.abc import Generator
 
 from openai import OpenAI
 from app.config import settings
+from app.prompts import SYSTEM_PROMPT
 
 # Create the client once — it manages connection pooling internally.
 # The api_key is read from our Settings object (which loaded it from .env).
@@ -26,7 +27,7 @@ def _build_messages(user_message: str) -> list[dict]:
     return [
         # "system" message sets the LLM's behavior/personality.
         # Change this to customize how your chatbot responds.
-        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "system", "content": SYSTEM_PROMPT},
         # "user" message is what the user typed.
         {"role": "user", "content": user_message},
     ]
