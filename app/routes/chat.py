@@ -66,6 +66,33 @@ def chat_stream(request: ChatRequest):
     """Stream tokens; user message is committed before streaming, assistant row after."""
 
     if settings.GUARD_ENABLED and not classify_query(request.message):
+        # Match POST /chat: persist thread + user turn + rejection so recent-conversations
+        # and load-conversation stay consistent (guard used to skip all DB writes here).
+        db_reject = SessionLocal()
+        try:
+            ensure_conversation(
+                db_reject, request.conversation_id, request.user_id
+            )
+            add_message(
+                db_reject,
+                request.conversation_id,
+                ROLE_USER,
+                request.message,
+                user_id=request.user_id,
+            )
+            add_message(
+                db_reject,
+                request.conversation_id,
+                ROLE_ASSISTANT,
+                REJECTION_MESSAGE,
+                user_id=request.user_id,
+            )
+            db_reject.commit()
+        except Exception:
+            db_reject.rollback()
+            raise
+        finally:
+            db_reject.close()
         return StreamingResponse(rejection_stream(), media_type="text/event-stream")
 
     db = SessionLocal()

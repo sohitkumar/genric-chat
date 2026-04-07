@@ -119,7 +119,7 @@ So: **validate → save user text → maybe block → maybe OpenAI → save assi
 
 Same idea as `/chat/`, with two important differences:
 
-- **Rejected (guard):** the stream returns a short SSE event; **no** database writes on that path (unlike non-streaming chat, which stores the rejection as a message).
+- **Rejected (guard):** the stream returns a short SSE event. The server **does** persist the conversation, the user message, and the rejection text (same as `POST /chat/`), so **recent-conversations** and **load-conversation** stay in sync with the UI.
 - **Allowed:** the **user** message is written and **committed** in one short DB session **before** streaming starts, so the server does not hold a DB connection open for the whole stream. When streaming **finishes**, a **new** session saves the full assistant text.
 
 If you are debugging “missing assistant message after stream,” check that the stream completed and that the final-save path ran.

@@ -106,7 +106,7 @@ Same body as `POST /chat`.
 
 **Response:** `text/event-stream` (SSE). Lines look like: `data: <text>\n\n`
 
-If the guard rejects the topic, you still get SSE (often one short event).
+If the guard rejects the topic, you still get SSE (often one short event). The user message and rejection are stored like `POST /chat`, so the thread appears in recent conversations and load-conversation.
 
 ---
 
