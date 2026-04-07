@@ -1,24 +1,45 @@
 # main.py — The entrypoint of your application.
 #
-# This file does THREE things:
-# 1. Creates the FastAPI app instance
-# 2. Includes routers (each router is a group of related endpoints)
-# 3. Runs the server when you do `python main.py`
-#
-# Keep this file thin — business logic belongs in services/, not here.
+# Lifespan: run Alembic migrations to head on startup, then dispose the engine on shutdown.
+
+from contextlib import asynccontextmanager
+from pathlib import Path
 
 import uvicorn
+from alembic import command
+from alembic.config import Config
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from sqlalchemy import text
+
+from app.db.session import engine
 from app.routes.chat import router as chat_router
+from app.routes.user import router as user_router
+
+
+def _run_alembic_upgrade_to_head() -> None:
+    """Apply all pending migrations. Safe to call every boot: no-op when already at head."""
+    ini_path = Path(__file__).resolve().parent / "alembic.ini"
+    if not ini_path.is_file():
+        raise RuntimeError(f"Alembic config not found: {ini_path}")
+    cfg = Config(str(ini_path))
+    command.upgrade(cfg, "head")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    _run_alembic_upgrade_to_head()
+    yield
+    engine.dispose()
+
 
 app = FastAPI(
     title="LLM Chatbot API",
     description="A minimal chatbot API powered by OpenAI",
+    lifespan=lifespan,
 )
 
-# CORS: allows your frontend (e.g., React on localhost:3000) to call this API.
-# Without this, browsers block cross-origin requests for security reasons.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -26,8 +47,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include the chat router — this adds the POST /chat endpoint
 app.include_router(chat_router)
+app.include_router(user_router)
 
 
 @app.get("/")
@@ -37,7 +58,20 @@ def read_root():
 
 @app.get("/health")
 def health_check():
-    return {"status": "healthy"}
+    """Liveness: always cheap. DB check uses the same engine as the app (see .env DATABASE_URL)."""
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+    except Exception as exc:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "unhealthy",
+                "database": "disconnected",
+                "detail": str(exc),
+            },
+        )
+    return {"status": "healthy", "database": "connected"}
 
 
 if __name__ == "__main__":

@@ -23,6 +23,7 @@ class Settings(BaseSettings):
 
     GUARD_ENABLED: bool = True
 
+    DATABASE_URL: str
     # Tell pydantic-settings to read from a .env file in the project root
     model_config = SettingsConfigDict(env_file=".env")
 

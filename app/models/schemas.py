@@ -2,21 +2,68 @@
 #
 # WHY Pydantic models?
 # 1. FastAPI uses these to automatically VALIDATE incoming requests.
-#    If a user sends bad data (e.g., missing "message"), FastAPI returns
-#    a clear 422 error without you writing any validation code.
-# 2. They auto-generate the Swagger docs at /docs — so your API is
-#    self-documenting.
-# 3. They act as a contract: anyone reading this file instantly knows
-#    what your API expects and returns.
+# 2. They auto-generate the Swagger docs at /docs.
+# 3. They act as a contract for API consumers.
 
-from pydantic import BaseModel
+from datetime import datetime
+from uuid import UUID, uuid4
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ChatRequest(BaseModel):
-    # The user's message to send to the LLM
+    """Body for sending a chat message. conversation_id groups turns into one thread."""
+
     message: str
+    conversation_id: UUID = Field(default_factory=uuid4)
+    # Set when the user is logged in; optional until you add auth on the client.
+    user_id: UUID | None = None
 
 
 class ChatResponse(BaseModel):
-    # The LLM's reply
+    """Immediate reply for non-streaming /chat."""
+
     reply: str
+
+
+class LoadConversationRequest(BaseModel):
+    """Body for loading stored messages for a thread (message text not required)."""
+
+    conversation_id: UUID
+
+
+class StoredMessageOut(BaseModel):
+    """One persisted turn, returned to the client."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    role: str
+    content: str
+    created_at: datetime
+
+
+class ConversationHistoryResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    conversation_id: UUID
+    messages: list[StoredMessageOut]
+
+
+class SignupRequest(BaseModel):
+    email: str
+    password: str
+
+class SignupResponse(BaseModel):
+    message: str
+    user_id: UUID
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+class LoginResponse(BaseModel):
+    message: str
+    user_id: UUID
+
+class RecentConversationsResponse(BaseModel):
+    conversations: list[ConversationHistoryResponse] = Field(default_factory=list)

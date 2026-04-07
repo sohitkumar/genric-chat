@@ -3,3 +3,7 @@ uvicorn[standard]
 openai
 pydantic-settings
 python-dotenv
+sqlalchemy>=2.0
+psycopg[binary]>=3.1
+alembic>=1.13
+bcrypt>=4.0
