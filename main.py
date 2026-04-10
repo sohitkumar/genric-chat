@@ -3,6 +3,9 @@
 # Lifespan: run Alembic migrations to head on startup, then dispose the engine on shutdown.
 
 from contextlib import asynccontextmanager
+import logging
+import sys
+import time
 from pathlib import Path
 
 import uvicorn
@@ -12,11 +15,47 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
 
 from app.config import settings
 from app.db.session import engine
 from app.routes.chat import router as chat_router
 from app.routes.user import router as user_router
+
+
+def _configure_app_logging() -> None:
+    """Send all ``app.*`` loggers to stderr so ``docker logs`` shows tracebacks (uvicorn often skips app loggers)."""
+    fmt = "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
+    datefmt = "%Y-%m-%d %H:%M:%S"
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setFormatter(logging.Formatter(fmt, datefmt=datefmt))
+    handler.setLevel(logging.INFO)
+    base = logging.getLogger("app")
+    base.setLevel(logging.INFO)
+    if not base.handlers:
+        base.addHandler(handler)
+    base.propagate = False
+
+
+class _RequestLogMiddleware(BaseHTTPMiddleware):
+    """Log every request status and log tracebacks for failures before the response is sent."""
+
+    async def dispatch(self, request: Request, call_next):
+        path = request.url.path
+        start = time.perf_counter()
+        try:
+            response = await call_next(request)
+            ms = (time.perf_counter() - start) * 1000
+            logging.getLogger("app.http").info(
+                "%s %s -> %s (%.1fms)", request.method, path, response.status_code, ms
+            )
+            return response
+        except Exception:
+            logging.getLogger("app.http").exception(
+                "%s %s raised before response", request.method, path
+            )
+            raise
 
 
 def _cors_allow_origins() -> list[str]:
@@ -38,6 +77,8 @@ def _run_alembic_upgrade_to_head() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    _configure_app_logging()
+    logging.getLogger("app.startup").info("Logging to stderr enabled for app.*")
     _run_alembic_upgrade_to_head()
     yield
     engine.dispose()
@@ -58,6 +99,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# Runs first on incoming request: logs path, status, and exceptions that occur before the body is returned.
+app.add_middleware(_RequestLogMiddleware)
 
 app.include_router(chat_router)
 app.include_router(user_router)
