@@ -24,6 +24,13 @@ class Settings(BaseSettings):
     GUARD_ENABLED: bool = True
 
     DATABASE_URL: str
+
+    # Public base URL of this API (e.g. https://api.example.com or http://EC2_IP:8000). Used for OpenAPI/Swagger
+    # "Try it" and server list. Set when behind a reverse proxy or when docs should show the real URL.
+    API_PUBLIC_URL: str | None = None
+
+    # Comma-separated browser origins allowed to call the API, or "*" for any origin (dev only).
+    CORS_ORIGINS: str = "*"
     # Tell pydantic-settings to read from a .env file in the project root
     model_config = SettingsConfigDict(env_file=".env")
 

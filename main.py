@@ -13,9 +13,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
+from app.config import settings
 from app.db.session import engine
 from app.routes.chat import router as chat_router
 from app.routes.user import router as user_router
+
+
+def _cors_allow_origins() -> list[str]:
+    raw = settings.CORS_ORIGINS.strip()
+    if raw == "*":
+        return ["*"]
+    origins = [o.strip() for o in raw.split(",") if o.strip()]
+    return origins if origins else ["*"]
 
 
 def _run_alembic_upgrade_to_head() -> None:
@@ -34,15 +43,18 @@ async def lifespan(app: FastAPI):
     engine.dispose()
 
 
-app = FastAPI(
+_fastapi_kw: dict = dict(
     title="LLM Chatbot API",
     description="A minimal chatbot API powered by OpenAI",
     lifespan=lifespan,
 )
+if settings.API_PUBLIC_URL:
+    _fastapi_kw["servers"] = [{"url": settings.API_PUBLIC_URL.rstrip("/")}]
+app = FastAPI(**_fastapi_kw)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_allow_origins(),
     allow_methods=["*"],
     allow_headers=["*"],
 )

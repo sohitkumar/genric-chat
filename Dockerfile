@@ -1,4 +1,4 @@
-# FastAPI + Alembic; expects DATABASE_URL and OPENAI_API_KEY at runtime (do not bake secrets into the image).
+# FastAPI + Alembic; at runtime set OPENAI_API_KEY, DATABASE_URL, and optionally API_PUBLIC_URL / CORS_ORIGINS.
 FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
