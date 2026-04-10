@@ -5,6 +5,7 @@
 # after streaming finishes (separate DB session so the pool is not tied to the stream).
 # POST /chat/load-conversation returns ordered history for a conversation_id.
 
+import logging
 from uuid import UUID
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
@@ -31,6 +32,8 @@ from app.services.conversation_store import (
 )
 from app.services.intent_classifier import classify_query
 from app.services.llm import get_chat_response, stream_chat_response
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -122,6 +125,9 @@ def chat_stream(request: ChatRequest):
                 pieces.append(token)
                 for line in token.split("\n"):
                     yield f"data: {line}\n\n"
+        except Exception:
+            logger.exception("POST /chat/stream LLM stream failed")
+            raise
         finally:
             full = "".join(pieces)
             if not full.strip():
@@ -131,6 +137,7 @@ def chat_stream(request: ChatRequest):
                 add_message(inner, conv_id, ROLE_ASSISTANT, full, user_id=user_id)
                 inner.commit()
             except Exception:
+                logger.exception("POST /chat/stream failed persisting assistant message")
                 inner.rollback()
                 raise
             finally:

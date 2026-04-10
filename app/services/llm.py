@@ -11,11 +11,14 @@
 # We create ONE OpenAI client at module level (so it's reused across requests),
 # then provide functions to get a complete response OR stream it token-by-token.
 
+import logging
 from collections.abc import Generator
 
 from openai import OpenAI
 from app.config import settings
 from app.prompts import SYSTEM_PROMPT
+
+logger = logging.getLogger(__name__)
 
 # Create the client once — it manages connection pooling internally.
 # The api_key is read from our Settings object (which loaded it from .env).
@@ -58,14 +61,25 @@ def stream_chat_response(user_message: str) -> Generator[str, None, None]:
     as it arrives, so the caller can forward it to the client in real-time.
     """
 
-    stream = client.chat.completions.create(
-        model=settings.MODEL_NAME,
-        messages=_build_messages(user_message),
-        stream=True,
-    )
+    try:
+        stream = client.chat.completions.create(
+            model=settings.MODEL_NAME,
+            messages=_build_messages(user_message),
+            stream=True,
+        )
+    except Exception:
+        logger.exception("OpenAI streaming request failed (create)")
+        raise
 
     for chunk in stream:
-        content = chunk.choices[0].delta.content
-        # delta.content is None for the final chunk (the stream-end signal)
+        # Some providers emit chunks with no choices, or role-only chunks before content.
+        if not chunk.choices:
+            continue
+        choice = chunk.choices[0]
+        delta = getattr(choice, "delta", None)
+        if delta is None:
+            continue
+        content = getattr(delta, "content", None)
+        # delta.content is None for some chunks (e.g. end-of-stream metadata)
         if content is not None:
             yield content
